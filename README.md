@@ -6,11 +6,14 @@ Máquina de Desenvolvimento
 
 ### Pré-requisitos <a name="prerequisito_dev"></a>
 
-* Ajustar o shell para realizar o login: Ex. abrir o shel com o comando => bash --login
+* Ajustar o shell para realizar o login: 
+    * Ex. abrir o shel com o comando => bash --login
 * Reabrir o Shell
 * Ao menos um Weberver deve estar instalado. 
     * Para utilizar o Apache Webserver:
-        * Digitar: ```which apache2```. Se não houver retorno deste comando, então o apache deve ser instalado. O retorno deve ser algo parecido como: ```/usr/sbin/apache2``` 
+        * Digitar: ```which apache2```. 
+            * Se não houver retorno deste comando, então o apache deve ser instalado. 
+            * O retorno deve ser algo parecido como: ```/usr/sbin/apache2``` 
         * Para Instalar o Apache: ```sudo apt-get install apache2```
     * Para utilizar o Nginx, verificar na Web.
 * Na maquina onde será instalado o TCC: ```sudo apt-get install openssh-server```
@@ -46,13 +49,13 @@ cd ~[/moodle-tcc-instala/]chef_tcc/.chef
 openssl rand -base64 1024 > encrypted_data_bag_secret
 ```
 
-Geração do usuário de deploy. A linha abaixo irá cifrar todos os dados    
+Geração do usuário de desenvolvimento. A linha abaixo irá cifrar todos os dados    
     
-**Ob.: Antes de gerar o usuário de deploy ele deve ser configurado** 
+**Ob.: Antes de gerar o usuário de desenvolvimento ele deve ser configurado** 
 
 ```sh
 cd ~[/moodle-tcc-instala]/chef_tcc/
-knife data bag from file users data_bags/users/deploy.json --secret-file .chef/encrypted_data_bag_secret
+knife data bag from file users data_bags/users/dev.json --secret-file .chef/encrypted_data_bag_secret
 ```
 
 ### Configurar a instalação <a name="configura_dev"></a>
@@ -67,26 +70,25 @@ a [instalação](#instala_dev) novamente. Dessa forma a instalação da ferramen
 #### run_list
 
     "run_list": [
-      "role[ubuntu]",
-      "role[deploy]",
-      "recipe[rvm]",
-      "recipe[rvm::system]",
-      "recipe[latex]",
-      "recipe[tcc_dev_env]",
-      "recipe[imagemagick]",
-      "recipe[imagemagick::devel]",
-      "recipe[imagemagick::rmagick]",
-      "recipe[tcc_unasus]",
-      "recipe[tcc_unasus::mysql]",
-      "recipe[tcc_unasus::tcc]",
-      "recipe[tcc_dev_env::after_install]"
+    "role[ubuntu]",
+    "recipe[latex]",
+    "role[dev]",
+    "recipe[rvm::system]",
+    "recipe[tcc_dev_env]",
+    "recipe[imagemagick]",
+    "recipe[imagemagick::devel]",
+    "recipe[imagemagick::rmagick]",
+    "recipe[tcc_unasus]",
+    "recipe[tcc_unasus::mysql]",
+    "recipe[tcc_unasus::tcc]",
+    "recipe[tcc_dev_env::after_install]"
     ]
 
 #### tcc_dev_env
     
     "tcc_dev_env": {
-      "user": "rsc",
-      "ruby_flavor": "ruby",
+      "user": "dev",          // Usuário de desenvolvimento, contido no data_bags/users/dev.json.example
+      "ruby_flavor": "ruby",  // Tipo de ruby que será utilizado para a instalação na máquina de desenvolvimento
       "ruby_version": "2.2.1"
     }
 
@@ -108,7 +110,7 @@ a [instalação](#instala_dev) novamente. Dessa forma a instalação da ferramen
 #### rvm 
 
     "rvm": {
-      "gpg": {
+      "gpg": { // Chave para a instalação do RVM
         "keyserver": "hkp://keys.gnupg.net:80",
         "homedir": "/root"
       },
@@ -122,10 +124,9 @@ a [instalação](#instala_dev) novamente. Dessa forma a instalação da ferramen
       "tccs": [
         {
           "name": "my_tcc_local",
-          "name2": "my_tcc_local",
-          "user_deploy": "rsc",
-          "config_dir": "/home/rsc/workspace/tcc",
-          "server_name": "", // deve ser vazio para desenvvolvimento
+          "user_deploy": "dev", // Usuário de desenvolvimento, contido no data_bags/users/dev.json.example
+          "config_dir": "/home/dev/workspace/tcc",
+          "server_name": "", // deve ser vazio para desenvolvimento
           //"server_name": "tcc.unasus.ufxx.br", // se for servidor deve conter o nome do site
           ...
           
@@ -133,17 +134,17 @@ a [instalação](#instala_dev) novamente. Dessa forma a instalação da ferramen
 
           ...
           "create_db_and_user": true,
-          "dbgrant_hosts": [
-            "localhost",
-            "127.0.0.1",
-            "150.162.242.121",
-            "192.168.25.41",
-            "192.168.3.103",
-            "150.162.66.136",
-            "150.162.9.59"
+          "dbgrant_hosts": [ // IPs que terão acesso à base de dados
+            "localhost",     // Acesso local
+            "127.0.0.1",     // Acesso local
+            "192.168.0.2"    // Caso alguma outra máquina na rede tenha acesso 
           ],
-          "xdatabase_download_site": "http://192.168.25.41/tcc_unasus-20150819.sql.gz",
-          "xdatabase_download_site": "http://192.168.3.103/tcc_unasus-20150819.sql.gz",
+
+          // A linha abaixo servirá para restaurar uma base de dados pré-existente do sistema de TCC, 
+          // para o caso de uma instalação rápida em outro servidor. Esta redundância pode ser utilizada 
+          // para balanceamento de carga, pelo NGinx, por exemplo.
+          
+          // "database_download_site": "http://192.168.0.2/tcc_unasus-backup.sql.gz",
           "dbadapter": "mysql2",
           "dbhost": "127.0.0.1",
           "dbname": "tcc_unasus",
@@ -155,47 +156,37 @@ a [instalação](#instala_dev) novamente. Dessa forma a instalação da ferramen
 #### Reporsitório
 
           ...  
-          "web_root_dir": "/home/rsc/workspace/tcc/current",
-          "git_auto_update": false,
-          "git_repo": "git@gitlab.setic.ufsc.br:tcc-unasus/sistema-tcc.git",
-          "git_revision": "master",
-          "root_https": false,
+          "web_root_dir": "/home/dev/workspace/tcc/current",
+          "git_auto_update": false, // Não é aconselhada a atualização automática do repositório
+          "git_repo": "git@github.com:UFSC/moodle-tcc.git",
+          "git_revision": "master", 
+          "root_https": false,      // Caso o webserver forneça https. False para desenvolvimento. 
           ...  
 
 #### Servidor de Email
 
           ...  
           "delivery_method": "file", //"smtp",
-          "smtp_address": "", //"smtp.sistemas.ufxx.br",
-          "smtp_port": "", //"25",
+          "smtp_address": "",        //"smtp.sistemas.ufxx.br",
+          "smtp_port": "",           //"25",
           "smtp_authentication": "", //"login",
-          "smtp_user_name": "", //"unasus",
-          "smtp_password": "", //"unasus123",
-          ...  
-
-#### Conexão com o moodle
-
-          ...  
-          "moodle_dbadapter": "mysql2",
-          "moodle_dbhost": "192.168.25.41",
-          "moodle_dbname": "moodle_unasus2",
-          "moodle_dbuser": "root",
-          "moodle_dbpass": "",
-          "moodle_dbport": "3306",
-          "moodle_dbsocket": false,
+          "smtp_user_name": "",      //"unasus",
+          "smtp_password": "",       //"unasus123",
           ...  
 
 #### Configuração do LTI do TCC
 
           ...  
           "tcc_moodle_url": "http://unasus2.local",
-          "tcc_moodle_token":  "2398954343ji34343iuy43g43432095x",
-          "tcc_consumer_key": "consumer_key",
-          "tcc_consumer_secret": "consumer_secret",
-          "tcc_notification_email ": "unasus@sistemas.ufxx.br"
+          "tcc_moodle_token":  "2398954343ji34343iuy43g43432095x", // Token
+          "tcc_consumer_key": "consumer_key",                      // chave para autenticação no LTI do Moodle
+          "tcc_consumer_secret": "consumer_secret",                // segredo da chave para autenticação no LTI do Moodle 
+          "tcc_notification_email ": "unasus@sistemas.ufxx.br"     // email para o envio
         }
       ]
     }
+
+Para
 
 
 
@@ -248,5 +239,53 @@ Geração da senha de deploy. A linha abaixo irá cifrar todos os dados
 cd ~[/moodle-tcc-instala]/chef_tcc/
 knife data bag from file users data_bags/users/deploy.json --secret-file .chef/encrypted_data_bag_secret
 ```
+
+Preparação do Moodle
+--------------------
+
+Dependências do wstcc: (atualizar https://gitlab.setic.ufsc.br/tcc-unasus/local-wstcc/tree/master, version.php) 
+
+* local/relationship // para agrupar estudantes e seus orientadores
+* local/tutores      // rotinas para pegar orientadores, tutores e estudantes
+* local/ufsc         // para pegar categoria correta conforme relationship de grupo de orientação
+
+### Criar usuário do Webservice do TCC
+
+* Criar usuário: Moodle_Config_User.png
+    * Nome: Webservice UNASUS TCC
+    * Metodo de autenticação: Autenticação do webservice
+ 
+### Criar um serviço externo para o Webservice do TCC
+
+* Minha página inicial / Administração do site / Plugins / Serviços da Web / Serviços externos
+    * Adicionar: Figura
+        * Nome: TCC Services
+        * Ativado: True
+        * Apenas usuários autorizados: True
+        * Pode baixar arquivos: True
+        * Pode fazer upload de arquivos: False
+        * Capacidades: 
+            * mod/assign:grade
+            * mod/assign:view
+            * moodle/course:view
+            * moodle/site:accessallgroups
+            * webservice/rest:use
+    * Usuários Autorizados: Usuário criado no passo anterior (Webservice UNASUS TCC)
+    
+### Criar token para o usuário do Webservice (Webservice UNASUS TCC)
+
+* Minha página inicial / Administração do site / Plugins / Serviços da Web / Gerenciar tokens 
+    * Adicionar: (figura)
+        * Identificação de usuário / id de usuário: Webservice UNASUS TCC (Criado anteriormente)
+        * Serviço: TCC Services (criado no passo anterior)
+    
+
+### Configurar     
+    
+Atividade de TCC no Moodle
+--------------------------
+
+Manual do Coordenador de AVEA, na seção "Configuração da atividade de TCC". O arquivo pode ser baixado em: link
+
 
 
